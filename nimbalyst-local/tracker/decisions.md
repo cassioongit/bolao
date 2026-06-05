@@ -1,0 +1,3 @@
+- Manter lançamento em PHP puro e MySQL na hospedagem compartilhada já validada #decision[id:dec_19e98d6278b6a6d status:done priority:high created:2026-06-05]
+- Operar a v1 com lançamento manual de resultados pelo admin #decision[id:dec_19e98d6278c76f1 status:done priority:high created:2026-06-05]
+- Tratar automação de resultados e melhorias cosméticas como pós-lançamento #decision[id:dec_19e98d6278d54b2 status:done priority:medium created:2026-06-05]

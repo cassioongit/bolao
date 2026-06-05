@@ -1,0 +1,15 @@
+# Segredos / configuração local
+.env
+includes/config.local.php
+nimbalyst-local/outbox/
+
+# Sistema
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Editor
+.vscode/
+.idea/

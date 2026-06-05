@@ -1,0 +1,2 @@
+- Integrar captura automática de resultados via API de futebol no cron #idea[id:ida_19e98d6278e2ab4 status:to-do priority:medium created:2026-06-05]
+- Evoluir o board com tags funcionais e owners por área após a estreia #idea[id:ida_19e98d6278f1908 status:to-do priority:low created:2026-06-05]

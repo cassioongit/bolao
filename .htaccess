@@ -1,0 +1,15 @@
+# ===== Bolão da Paz — proteção básica (Apache) =====
+
+# Bloqueia acesso direto a arquivos sensíveis
+<FilesMatch "(^\.env|\.env\..*|composer\.(json|lock)|\.gitignore)$">
+    Require all denied
+</FilesMatch>
+
+# Bloqueia acesso às pastas internas (também há index/blank nelas)
+RedirectMatch 403 ^/(includes|sql)/.*\.(php|sql|sh)$
+
+# UTF-8 por padrão
+AddDefaultCharset UTF-8
+
+# Evita listagem de diretórios
+Options -Indexes
