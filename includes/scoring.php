@@ -60,6 +60,7 @@ function classic_stage_multipliers(): array
 {
     return [
         'grupos' => 1,
+        'r32' => 2,
         'r16' => 2,
         'qf' => 3,
         'sf' => 4,
@@ -78,6 +79,7 @@ function classic_multiplier_case_sql(string $stageColumn = 'm.fase'): string
 {
     return "CASE
         WHEN {$stageColumn} = 'grupos' THEN 1
+        WHEN {$stageColumn} = 'r32' THEN 2
         WHEN {$stageColumn} = 'r16' THEN 2
         WHEN {$stageColumn} = 'qf' THEN 3
         WHEN {$stageColumn} = 'sf' THEN 4
@@ -297,6 +299,7 @@ function recalc_bonus_points(): void
     $pdo = db();
     $gab = $pdo->query('SELECT * FROM tournament_results WHERE id = 1')->fetch();
     if (!$gab) {
+        error_log('recalc_bonus_points: No tournament_results row found (id=1)');
         return;
     }
 

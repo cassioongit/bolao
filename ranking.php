@@ -82,7 +82,8 @@ require __DIR__ . '/includes/header.php';
             $total = (int)$r['pontos'] + (int)$r['pontos_bonus'];
             $me = (int)$r['id'] === (int)$u['id'];
             $rowIndex = $pos - 1;
-            $tieRelevant = (($totals[$rowIndex - 1] ?? null) === $total) || (($totals[$rowIndex + 1] ?? null) === $total);
+            $tieRelevant = ($rowIndex > 0 && $totals[$rowIndex - 1] === $total) ||
+                          ($rowIndex < count($totals) - 1 && $totals[$rowIndex + 1] === $total);
         ?>
             <tr class="<?= $me ? 'me' : '' ?>">
                 <td data-label="#" class="rank-pos"><?= $pos ?>º</td>

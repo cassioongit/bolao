@@ -24,6 +24,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $isOwner) {
             $poolId,
         ]);
         recalc_bonus_points();
+        foreach (db()->query('SELECT id FROM matches WHERE status = \'encerrado\' AND home_score IS NOT NULL AND away_score IS NOT NULL') as $row) {
+            recalc_match_points((int)$row['id']);
+        }
         flash('Configurações salvas.', 'success');
         redirect('bolao.php?id=' . $poolId);
     }

@@ -175,8 +175,16 @@ function recalc_closed_pool_prediction_points(int $poolId): void
 function sync_member_predictions_to_pool(int $poolId, int $userId): void
 {
     ensure_canonical_predictions($userId);
-    sync_canonical_predictions_to_pool($poolId, $userId);
-    recalc_closed_pool_prediction_points($poolId);
+    $pdo = db();
+    try {
+        $pdo->exec('BEGIN');
+        sync_canonical_predictions_to_pool($poolId, $userId);
+        recalc_closed_pool_prediction_points($poolId);
+        $pdo->exec('COMMIT');
+    } catch (Exception $e) {
+        $pdo->exec('ROLLBACK');
+        throw $e;
+    }
 }
 
 /**
@@ -366,7 +374,10 @@ function pool_ranking(int $poolId, array $pool): array
                    SUM(CASE WHEN {$scenarioCase} = '" . CLASSIC_SCENARIO_ONE_TEAM_SCORE_ONLY . "' THEN 1 ELSE 0 END) AS one_team_only,
                    SUM(CASE WHEN {$scenarioCase} = '" . CLASSIC_SCENARIO_MISS . "' THEN 1 ELSE 0 END) AS misses,
                    (SELECT COALESCE(SUM(bp.pontos),0) FROM bonus_predictions bp
-                      WHERE bp.pool_id = pm.pool_id AND bp.user_id = u.id) AS pontos_bonus
+                      WHERE bp.pool_id = pm.pool_id AND bp.user_id = u.id) AS pontos_bonus,
+                   (COALESCE(SUM(COALESCE(pr.pontos, 0) * {$multiplierCase}), 0) +
+                    (SELECT COALESCE(SUM(bp.pontos),0) FROM bonus_predictions bp
+                       WHERE bp.pool_id = pm.pool_id AND bp.user_id = u.id)) AS total_ranking
             FROM pool_members pm
             JOIN users u ON u.id = pm.user_id
             LEFT JOIN matches m ON m.status = 'encerrado'
@@ -376,9 +387,7 @@ function pool_ranking(int $poolId, array $pool): array
                   AND pr.match_id = m.id
             WHERE pm.pool_id = ?
             GROUP BY u.id, u.nome, pm.pool_id
-            ORDER BY (COALESCE(SUM(COALESCE(pr.pontos, 0) * {$multiplierCase}),0) +
-                      (SELECT COALESCE(SUM(bp.pontos),0) FROM bonus_predictions bp
-                         WHERE bp.pool_id = pm.pool_id AND bp.user_id = u.id)) DESC,
+            ORDER BY total_ranking DESC,
                      exatos DESC,
                      winner_plus_one DESC,
                      winner_only DESC,

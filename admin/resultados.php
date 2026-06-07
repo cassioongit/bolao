@@ -6,19 +6,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_require();
     $matchId = (int)($_POST['match_id'] ?? 0);
     $acao = $_POST['acao'] ?? '';
+    $pdo = db();
 
-    if ($acao === 'salvar') {
-        $h = (int)($_POST['home_score'] ?? 0);
-        $a = (int)($_POST['away_score'] ?? 0);
-        db()->prepare("UPDATE matches SET home_score=?, away_score=?, status='encerrado' WHERE id=?")
-            ->execute([$h, $a, $matchId]);
-        recalc_match_points($matchId);
-        flash('Resultado salvo e pontos calculados.', 'success');
-    } elseif ($acao === 'reabrir') {
-        db()->prepare("UPDATE matches SET home_score=NULL, away_score=NULL, status='agendado' WHERE id=?")
-            ->execute([$matchId]);
-        recalc_match_points($matchId);
-        flash('Jogo reaberto (pontos zerados).', 'info');
+    try {
+        $pdo->exec('BEGIN');
+        if ($acao === 'salvar') {
+            $h = (int)($_POST['home_score'] ?? 0);
+            $a = (int)($_POST['away_score'] ?? 0);
+            $pdo->prepare("UPDATE matches SET home_score=?, away_score=?, status='encerrado' WHERE id=?")
+                ->execute([$h, $a, $matchId]);
+            recalc_match_points($matchId);
+            flash('Resultado salvo e pontos calculados.', 'success');
+        } elseif ($acao === 'reabrir') {
+            $pdo->prepare("UPDATE matches SET home_score=NULL, away_score=NULL, status='agendado' WHERE id=?")
+                ->execute([$matchId]);
+            recalc_match_points($matchId);
+            flash('Jogo reaberto (pontos zerados).', 'info');
+        }
+        $pdo->exec('COMMIT');
+    } catch (Exception $e) {
+        $pdo->exec('ROLLBACK');
+        flash('Erro ao salvar resultado: ' . $e->getMessage(), 'error');
     }
     redirect('resultados.php' . (isset($_GET['fase']) ? '?fase=' . urlencode($_GET['fase']) : ''));
 }
