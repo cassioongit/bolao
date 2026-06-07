@@ -1,15 +1,90 @@
-# Segredos / configuração local
+# ===== CREDENCIAIS E CONFIGURAÇÃO SENSÍVEL =====
 .env
+.env.local
+.env.*.local
 includes/config.local.php
-nimbalyst-local/outbox/
+config/database.local.php
 
-# Sistema
+# ===== ARQUIVOS DO SISTEMA =====
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
 Thumbs.db
+.AppleDouble
+.LSOverride
+*.swp
+*.swo
+*~
 
-# Logs
+# ===== LOGS E DEBUGGING =====
 *.log
+logs/
+debug/
+*.tmp
 
-# Editor
+# ===== EDITORES E IDEs =====
 .vscode/
 .idea/
+*.iml
+*.iws
+*.ipr
+*.sublime-project
+*.sublime-workspace
+.atom/
+.netbeans/
+.eclipse/
+.project
+.pydevproject
+.settings/
+*.code-workspace
+
+# ===== COMPOSER (PHP) =====
+vendor/
+composer.lock
+
+# ===== FERRAMENTAS DE DESENVOLVIMENTO =====
+_bmad/
+_bmad-output/
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# ===== NIMBALYST =====
+nimbalyst-local/
+.claude/
+.claude/**/*
+
+# ===== ARQUIVOS DE BACKUP E TEMPORÁRIOS =====
+*.bak
+*.backup
+*.tmp
+*.temp
+*.swp
+*~
+.#*
+
+# ===== BANCO DE DADOS =====
+*.sql
+*.sqlite
+*.db
+*.mdb
+dump.sql
+
+# ===== COMPILADOS E BUILD =====
+*.o
+*.so
+*.dylib
+*.exe
+*.class
+*.jar
+
+# ===== ENVS E SECRETS =====
+.npmrc
+.env.prod
+.env.staging
+secrets/
+keys/
+credentials/

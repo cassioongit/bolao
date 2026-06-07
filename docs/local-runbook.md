@@ -2,9 +2,11 @@
 
 ## Current Reality
 
-- This Codex session does not have `php` installed, so local execution must happen in your normal machine environment.
 - The project is already wired for the built-in PHP server and a MySQL database configured through `.env`.
-- Canonical base URL for local testing: `http://localhost:8050`
+- Local validation in this project has been executed successfully with the built-in PHP server and the remote MySQL database configured in `.env`.
+- Canonical local test URL should match the host you actually use in the browser:
+  - `http://localhost:8050` if `APP_URL=http://localhost:8050`
+  - `http://127.0.0.1:8050` if `APP_URL=http://127.0.0.1:8050`
 
 ## One-Time Setup
 
@@ -27,13 +29,13 @@ mysql -h HOST -P 3306 -u USER -p DB_NAME < sql/seed.sql
 Run this from the project root:
 
 ```bash
-php -S localhost:8050
+php -S 127.0.0.1:8050
 ```
 
 Then open:
 
 ```text
-http://localhost:8050
+http://127.0.0.1:8050
 ```
 
 ## Expected First Checks
@@ -44,5 +46,6 @@ http://localhost:8050
 
 ## Notes
 
-- `includes/config.php` auto-detects `APP_URL` when not set, but local work should keep `APP_URL=http://localhost:8050` to avoid ambiguity.
+- `includes/config.php` auto-detects `APP_URL` when not set, but local work should keep `APP_URL` aligned with the exact host used for testing to avoid redirect/cookie ambiguity.
 - The application stores timestamps in UTC and displays them in `America/Sao_Paulo`.
+- Schema import, seed import, login, pool creation, prediction save, bonus save, result launch, ranking recalculation, multiplier handling, and tie-break handling have all been validated against the current codebase.

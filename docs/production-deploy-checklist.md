@@ -50,10 +50,15 @@ Also set:
 - Pool creation works.
 - Invite join works.
 - A prediction can be saved.
+- Bonus picks can be saved and reopened before the tournament lock.
 - Admin can open the admin area.
+- Admin can launch a result and see ranking update without manual DB repair.
+- At least one multiplier-bearing stage result is validated in ranking output.
+- Ranking ties follow the official precedence order.
 
 ## Operational Notes
 
 - `cron/fetch_results.php` is not part of launch; result entry is manual in v1.
 - `SHOW_ERRORS=false` is mandatory for launch so PHP warnings are not exposed to users.
 - Keep a copy of the final production `.env` values outside the repo.
+- `APP_URL` must match the exact public host used by end users to avoid redirect and session inconsistencies.

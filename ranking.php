@@ -12,24 +12,47 @@ $fasesValidas = ['grupos','r32','r16','qf','sf','terceiro','final'];
 
 if ($fase !== 'geral' && in_array($fase, $fasesValidas, true)) {
     // Ranking só da fase escolhida (apenas pontos de placar)
-    $sql = 'SELECT u.id, u.nome,
-                   COALESCE(SUM(pr.pontos),0) AS pontos,
-                   SUM(CASE WHEN pr.pontos = ? THEN 1 ELSE 0 END) AS exatos,
+    $multiplierCase = classic_multiplier_case_sql('m.fase');
+    $scenarioCase = classic_scenario_case_sql();
+    $sql = "SELECT u.id, u.nome,
+                   COALESCE(SUM(COALESCE(pr.pontos, 0) * {$multiplierCase}),0) AS pontos,
+                   SUM(CASE WHEN {$scenarioCase} = '" . CLASSIC_SCENARIO_EXACT . "' THEN 1 ELSE 0 END) AS exatos,
+                   SUM(CASE WHEN {$scenarioCase} = '" . CLASSIC_SCENARIO_WINNER_AND_ONE_TEAM_SCORE . "' THEN 1 ELSE 0 END) AS winner_plus_one,
+                   SUM(CASE WHEN {$scenarioCase} = '" . CLASSIC_SCENARIO_WINNER_ONLY . "' THEN 1 ELSE 0 END) AS winner_only,
+                   SUM(CASE WHEN {$scenarioCase} = '" . CLASSIC_SCENARIO_DRAW_NON_EXACT . "' THEN 1 ELSE 0 END) AS draw_non_exact,
+                   SUM(CASE WHEN {$scenarioCase} = '" . CLASSIC_SCENARIO_ONE_TEAM_SCORE_ONLY . "' THEN 1 ELSE 0 END) AS one_team_only,
+                   SUM(CASE WHEN {$scenarioCase} = '" . CLASSIC_SCENARIO_MISS . "' THEN 1 ELSE 0 END) AS misses,
                    0 AS pontos_bonus
             FROM pool_members pm
             JOIN users u ON u.id = pm.user_id
-            LEFT JOIN predictions pr ON pr.pool_id = pm.pool_id AND pr.user_id = u.id
-            LEFT JOIN matches m ON m.id = pr.match_id
-            WHERE pm.pool_id = ? AND (m.fase = ? OR m.fase IS NULL)
+            LEFT JOIN matches m ON m.status = 'encerrado' AND m.fase = ?
+            LEFT JOIN predictions pr
+                   ON pr.pool_id = pm.pool_id
+                  AND pr.user_id = u.id
+                  AND pr.match_id = m.id
+            WHERE pm.pool_id = ?
             GROUP BY u.id, u.nome
-            ORDER BY pontos DESC, exatos DESC, u.nome ASC';
+            ORDER BY pontos DESC,
+                     exatos DESC,
+                     winner_plus_one DESC,
+                     winner_only DESC,
+                     draw_non_exact DESC,
+                     one_team_only DESC,
+                     misses ASC,
+                     u.nome ASC";
     $stmt = db()->prepare($sql);
-    $stmt->execute([(int)$pool['pts_exato'], $poolId, $fase]);
+    $stmt->execute([$fase, $poolId]);
     $rows = $stmt->fetchAll();
+    foreach ($rows as &$row) {
+        $row['tiebreak'] = classic_ranking_tiebreak_breakdown($row);
+    }
+    unset($row);
 } else {
     $fase = 'geral';
     $rows = pool_ranking($poolId, $pool);
 }
+
+$totals = array_map(static fn(array $row): int => (int)$row['pontos'] + (int)$row['pontos_bonus'], $rows);
 
 $page_title = 'Ranking — ' . $pool['nome'];
 require __DIR__ . '/includes/header.php';
@@ -49,7 +72,7 @@ require __DIR__ . '/includes/header.php';
         </select>
     </form>
 
-    <table>
+    <table class="responsive-table">
         <thead>
             <tr><th class="rank-pos">#</th><th>Participante</th><th style="text-align:right">Bônus</th><th style="text-align:right">Exatos</th><th class="rank-pts">Pontos</th></tr>
         </thead>
@@ -58,20 +81,55 @@ require __DIR__ . '/includes/header.php';
             $pos++;
             $total = (int)$r['pontos'] + (int)$r['pontos_bonus'];
             $me = (int)$r['id'] === (int)$u['id'];
+            $rowIndex = $pos - 1;
+            $tieRelevant = (($totals[$rowIndex - 1] ?? null) === $total) || (($totals[$rowIndex + 1] ?? null) === $total);
         ?>
             <tr class="<?= $me ? 'me' : '' ?>">
-                <td class="rank-pos"><?= $pos ?>º</td>
-                <td><?= e($r['nome']) ?><?= $me ? ' <span class="muted">(você)</span>' : '' ?></td>
-                <td style="text-align:right"><?= (int)$r['pontos_bonus'] ?></td>
-                <td style="text-align:right"><?= (int)$r['exatos'] ?></td>
-                <td class="rank-pts"><?= $total ?></td>
+                <td data-label="#" class="rank-pos"><?= $pos ?>º</td>
+                <td data-label="Participante"><?= e($r['nome']) ?><?= $me ? ' <span class="muted">(você)</span>' : '' ?></td>
+                <td data-label="Bônus" style="text-align:right"><?= (int)$r['pontos_bonus'] ?></td>
+                <td data-label="Exatos" style="text-align:right"><?= (int)$r['exatos'] ?></td>
+                <td data-label="Pontos" class="rank-pts"><?= $total ?></td>
             </tr>
+            <?php if ($tieRelevant): ?>
+            <tr class="tie-row<?= $me ? ' me' : '' ?>">
+                <td></td>
+                <td colspan="4">
+                    <details class="tie-explainer">
+                        <summary>Ver desempate</summary>
+                        <div class="explanation-grid">
+                            <?php foreach (($r['tiebreak']['criteria'] ?? []) as $criterion): ?>
+                                <div>
+                                    <span class="muted"><?= e($criterion['label']) ?></span>
+                                    <strong><?= (int)$criterion['count'] ?></strong>
+                                </div>
+                            <?php endforeach; ?>
+                        </div>
+                    </details>
+                </td>
+            </tr>
+            <?php endif; ?>
         <?php endforeach; ?>
         <?php if (!$rows): ?>
             <tr><td colspan="5" class="muted center">Sem participantes ainda.</td></tr>
         <?php endif; ?>
         </tbody>
     </table>
-    <p class="muted" style="font-size:.8rem">Desempate: maior número de placares exatos. Os pontos aparecem assim que o admin lança o resultado de cada jogo.</p>
+    <p class="muted" style="font-size:.8rem">Desempate: placar exato, vencedor + gols de um time, vencedor, empate sem placar exato, um time correto e, por último, menos erros/ausências.</p>
+</div>
+
+<div class="card">
+    <h2>Multiplicadores por fase</h2>
+    <table>
+        <thead><tr><th>Fase</th><th class="rank-pts">Multiplicador</th></tr></thead>
+        <tbody>
+        <?php foreach (classic_stage_multipliers() as $stageKey => $multiplier): ?>
+            <tr>
+                <td><?= e(stage_label($stageKey)) ?></td>
+                <td class="rank-pts">x<?= (int)$multiplier ?></td>
+            </tr>
+        <?php endforeach; ?>
+        </tbody>
+    </table>
 </div>
 <?php require __DIR__ . '/includes/footer.php'; ?>

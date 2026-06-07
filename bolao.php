@@ -8,26 +8,21 @@ if (!$pool) { http_response_code(404); die('Bolão não encontrado.'); }
 $member = require_pool_member($poolId, (int)$u['id']);
 $isOwner = $member['papel'] === 'owner';
 
-// Dono pode ajustar nome e pontuação
+// Dono pode ajustar nome e bônus. A pontuação de jogos segue regra fixa.
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $isOwner) {
     csrf_require();
     $acao = $_POST['acao'] ?? '';
     if ($acao === 'config') {
         $nome = trim($_POST['nome'] ?? $pool['nome']);
-        $campos = ['pts_exato','pts_saldo','pts_gols_um','pts_vencedor','pts_campeao','pts_vice','pts_terceiro','pts_quarto','pts_artilheiro'];
+        $campos = ['pts_campeao','pts_vice','pts_terceiro','pts_quarto','pts_artilheiro'];
         $vals = [];
         foreach ($campos as $c) { $vals[$c] = max(0, (int)($_POST[$c] ?? $pool[$c])); }
-        $sql = 'UPDATE pools SET nome=?, pts_exato=?, pts_saldo=?, pts_gols_um=?, pts_vencedor=?,
-                   pts_campeao=?, pts_vice=?, pts_terceiro=?, pts_quarto=?, pts_artilheiro=? WHERE id=?';
+        $sql = 'UPDATE pools SET nome=?, pts_campeao=?, pts_vice=?, pts_terceiro=?, pts_quarto=?, pts_artilheiro=? WHERE id=?';
         db()->prepare($sql)->execute([
-            $nome, $vals['pts_exato'], $vals['pts_saldo'], $vals['pts_gols_um'], $vals['pts_vencedor'],
+            $nome,
             $vals['pts_campeao'], $vals['pts_vice'], $vals['pts_terceiro'], $vals['pts_quarto'], $vals['pts_artilheiro'],
             $poolId,
         ]);
-        // Recalcula pois a pontuação pode ter mudado
-        foreach (db()->query('SELECT id FROM matches WHERE status = \'encerrado\'') as $row) {
-            recalc_match_points((int)$row['id']);
-        }
         recalc_bonus_points();
         flash('Configurações salvas.', 'success');
         redirect('bolao.php?id=' . $poolId);
@@ -97,12 +92,14 @@ require __DIR__ . '/includes/header.php';
         <label>Nome do bolão</label>
         <input type="text" name="nome" value="<?= e($pool['nome']) ?>" maxlength="80">
 
-        <h3 style="margin-top:18px">Pontos por placar</h3>
+        <h3 style="margin-top:18px">Pontuação dos jogos</h3>
+        <p class="muted">A pontuação dos jogos segue a regra Classic oficial para todos os bolões.</p>
         <div class="default-bar">
-            <div><label>Placar exato</label><input type="number" name="pts_exato" value="<?= (int)$pool['pts_exato'] ?>" min="0"></div>
-            <div><label>Vencedor + saldo</label><input type="number" name="pts_saldo" value="<?= (int)$pool['pts_saldo'] ?>" min="0"></div>
-            <div><label>Vencedor + gols de um time</label><input type="number" name="pts_gols_um" value="<?= (int)$pool['pts_gols_um'] ?>" min="0"></div>
-            <div><label>Só o vencedor/empate</label><input type="number" name="pts_vencedor" value="<?= (int)$pool['pts_vencedor'] ?>" min="0"></div>
+            <div><label>Placar exato</label><input type="number" value="<?= classic_score_points()[CLASSIC_SCENARIO_EXACT] ?>" disabled></div>
+            <div><label>Vencedor + gols de um time</label><input type="number" value="<?= classic_score_points()[CLASSIC_SCENARIO_WINNER_AND_ONE_TEAM_SCORE] ?>" disabled></div>
+            <div><label>Só o vencedor</label><input type="number" value="<?= classic_score_points()[CLASSIC_SCENARIO_WINNER_ONLY] ?>" disabled></div>
+            <div><label>Empate sem placar exato</label><input type="number" value="<?= classic_score_points()[CLASSIC_SCENARIO_DRAW_NON_EXACT] ?>" disabled></div>
+            <div><label>Gols de um time</label><input type="number" value="<?= classic_score_points()[CLASSIC_SCENARIO_ONE_TEAM_SCORE_ONLY] ?>" disabled></div>
         </div>
 
         <h3 style="margin-top:18px">Pontos de bônus</h3>

@@ -30,6 +30,9 @@ Run one realistic end-to-end scenario on the final target environment.
 - [ ] Save bonus picks
 - [ ] Launch a result as admin
 - [ ] Confirm ranking update
+- [ ] Confirm at least one multiplier-bearing match affects ranking correctly
+- [ ] Confirm a tie-break case follows the official precedence order
+- [ ] Confirm score explanation data is available on scored predictions/ranking rows
 - [ ] Confirm no manual DB intervention was needed
 
 ## Done When

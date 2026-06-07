@@ -92,6 +92,21 @@ CREATE TABLE IF NOT EXISTS pool_members (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS user_match_predictions (
+    id            INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    user_id       INT UNSIGNED NOT NULL,
+    match_id      INT UNSIGNED NOT NULL,
+    home_pred     TINYINT UNSIGNED NOT NULL,
+    away_pred     TINYINT UNSIGNED NOT NULL,
+    atualizado_em DATETIME NOT NULL,
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_user_match_prediction (user_id, match_id),
+    KEY idx_ump_match (match_id),
+    CONSTRAINT fk_ump_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    CONSTRAINT fk_ump_match FOREIGN KEY (match_id) REFERENCES matches(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS predictions (
     id            INT UNSIGNED NOT NULL AUTO_INCREMENT,
     pool_id       INT UNSIGNED NOT NULL,

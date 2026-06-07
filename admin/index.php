@@ -9,10 +9,41 @@ $counts = [
     'encerrados' => (int)db()->query("SELECT COUNT(*) c FROM matches WHERE status='encerrado'")->fetch()['c'],
 ];
 
+$pendingStmt = db()->prepare(
+    "SELECT m.id, m.kickoff_utc, m.fase, m.grupo,
+            th.nome AS home_nome, th.bandeira AS home_bandeira,
+            ta.nome AS away_nome, ta.bandeira AS away_bandeira
+     FROM matches m
+     LEFT JOIN teams th ON th.id = m.home_team_id
+     LEFT JOIN teams ta ON ta.id = m.away_team_id
+     WHERE m.status <> 'encerrado'
+       AND m.kickoff_utc < UTC_TIMESTAMP()
+     ORDER BY m.kickoff_utc ASC, m.id ASC
+     LIMIT 5"
+);
+$pendingStmt->execute();
+$pendingResults = $pendingStmt->fetchAll();
+$pendingCount = (int)db()->query("SELECT COUNT(*) c FROM matches WHERE status <> 'encerrado' AND kickoff_utc < UTC_TIMESTAMP()")->fetch()['c'];
+
 $page_title = 'Administração';
 require __DIR__ . '/../includes/header.php';
 ?>
 <h1>Administração</h1>
+<?php if ($pendingCount > 0): ?>
+<div class="card alert-card">
+    <h2>Resultados pendentes</h2>
+    <p><strong><?= $pendingCount ?></strong> jogo(s) já passaram do horário e ainda não tiveram resultado lançado.</p>
+    <p><a class="btn" href="<?= e(APP_URL) ?>/admin/resultados.php">Ir para lançar resultados</a></p>
+    <div class="pending-list">
+        <?php foreach ($pendingResults as $m): ?>
+            <div class="pending-item">
+                <strong><?= e(side_label($m, 'home')) ?> x <?= e(side_label($m, 'away')) ?></strong>
+                <span class="muted"><?= e(fmt_datetime($m['kickoff_utc'])) ?> · <?= e(stage_label($m['fase'])) ?><?= $m['grupo'] ? ' ' . e($m['grupo']) : '' ?></span>
+            </div>
+        <?php endforeach; ?>
+    </div>
+</div>
+<?php endif; ?>
 <div class="card">
     <p class="muted">
         <?= $counts['usuarios'] ?> usuários ·

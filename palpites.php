@@ -104,6 +104,22 @@ require __DIR__ . '/includes/header.php';
                         <?php endif; ?>
                     </span>
                 </div>
+                <?php if ($encerrado && !empty($pred['score_breakdown'])):
+                    $bd = $pred['score_breakdown'];
+                ?>
+                    <div class="score-explainer" style="grid-column:1 / -1">
+                        <details>
+                            <summary>Ver pontuação</summary>
+                            <div class="explanation-grid">
+                                <div><span class="muted">Critério</span><strong><?= e($bd['scenario_label']) ?></strong></div>
+                                <div><span class="muted">Pontos base</span><strong><?= (int)$bd['base_points'] ?></strong></div>
+                                <div><span class="muted">Fase</span><strong><?= e($bd['stage_label']) ?></strong></div>
+                                <div><span class="muted">Multiplicador</span><strong>x<?= (int)$bd['multiplier'] ?></strong></div>
+                                <div><span class="muted">Total no ranking</span><strong><?= (int)$bd['weighted_points'] ?></strong></div>
+                            </div>
+                        </details>
+                    </div>
+                <?php endif; ?>
             </div>
         <?php endforeach; ?>
         </div>

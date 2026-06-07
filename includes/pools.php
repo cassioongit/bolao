@@ -35,6 +35,7 @@ function require_pool_member(int $poolId, int $userId): array
         http_response_code(403);
         die('Você não participa deste bolão.');
     }
+    ensure_member_predictions_projected($poolId, $userId);
     return $m;
 }
 
@@ -74,6 +75,10 @@ function add_pool_member(int $poolId, int $userId, string $papel = 'membro'): vo
          VALUES (?, ?, ?, UTC_TIMESTAMP())'
     );
     $stmt->execute([$poolId, $userId, $papel]);
+
+    if ($stmt->rowCount() > 0) {
+        sync_member_predictions_to_pool($poolId, $userId);
+    }
 }
 
 /** URL completa do convite. */
@@ -83,13 +88,161 @@ function invite_url(array $pool): string
 }
 
 /**
+ * Se ainda não existir linha canônica para um usuário/match,
+ * reaproveita o palpite mais recente encontrado na projeção por bolão.
+ */
+function backfill_canonical_predictions(int $userId): void
+{
+    $sql = 'SELECT match_id, home_pred, away_pred, atualizado_em
+            FROM predictions
+            WHERE user_id = ?
+            ORDER BY match_id ASC, atualizado_em DESC, id DESC';
+    $stmt = db()->prepare($sql);
+    $stmt->execute([$userId]);
+
+    $seen = [];
+    $ins = db()->prepare(
+        'INSERT IGNORE INTO user_match_predictions (user_id, match_id, home_pred, away_pred, atualizado_em)
+         VALUES (?, ?, ?, ?, ?)'
+    );
+
+    foreach ($stmt as $row) {
+        $matchId = (int)$row['match_id'];
+        if (isset($seen[$matchId])) {
+            continue;
+        }
+        $seen[$matchId] = true;
+        $ins->execute([
+            $userId,
+            $matchId,
+            (int)$row['home_pred'],
+            (int)$row['away_pred'],
+            $row['atualizado_em'],
+        ]);
+    }
+}
+
+/**
+ * Garante que os palpites canônicos do usuário existam na nova fonte de verdade.
+ * O backfill roda no máximo uma vez por usuário em cada request.
+ */
+function ensure_canonical_predictions(int $userId): void
+{
+    static $hydratedUsers = [];
+    if (isset($hydratedUsers[$userId])) {
+        return;
+    }
+    backfill_canonical_predictions($userId);
+    $hydratedUsers[$userId] = true;
+}
+
+/** Sincroniza todos os palpites canônicos do usuário para um bolão específico. */
+function sync_canonical_predictions_to_pool(int $poolId, int $userId): void
+{
+    $sql = 'INSERT INTO predictions (pool_id, user_id, match_id, home_pred, away_pred, pontos, atualizado_em)
+            SELECT ?, ?, ump.match_id, ump.home_pred, ump.away_pred, NULL, ump.atualizado_em
+            FROM user_match_predictions ump
+            WHERE ump.user_id = ?
+            ON DUPLICATE KEY UPDATE home_pred = VALUES(home_pred),
+                                    away_pred = VALUES(away_pred),
+                                    pontos = NULL,
+                                    atualizado_em = VALUES(atualizado_em)';
+    db()->prepare($sql)->execute([$poolId, $userId, $userId]);
+}
+
+/**
+ * Recalcula a projeção do bolão para jogos já encerrados, evitando rankings
+ * incompletos quando o usuário entra em um bolão depois de já ter palpitado.
+ */
+function recalc_closed_pool_prediction_points(int $poolId): void
+{
+    $stmt = db()->prepare(
+        'SELECT DISTINCT pr.match_id
+         FROM predictions pr
+         JOIN matches m ON m.id = pr.match_id
+         WHERE pr.pool_id = ?
+           AND m.status = \'encerrado\'
+           AND m.home_score IS NOT NULL
+           AND m.away_score IS NOT NULL'
+    );
+    $stmt->execute([$poolId]);
+    foreach ($stmt as $row) {
+        recalc_match_points((int)$row['match_id']);
+    }
+}
+
+/** Hidrata a fonte canônica e projeta os palpites do membro no bolão. */
+function sync_member_predictions_to_pool(int $poolId, int $userId): void
+{
+    ensure_canonical_predictions($userId);
+    sync_canonical_predictions_to_pool($poolId, $userId);
+    recalc_closed_pool_prediction_points($poolId);
+}
+
+/**
+ * Auto-recupera memberships antigos criados antes do patch, garantindo que o
+ * bolão tenha a projeção compatível dos palpites canônicos daquele membro.
+ * Roda no máximo uma vez por par pool/usuário em cada request.
+ */
+function ensure_member_predictions_projected(int $poolId, int $userId): void
+{
+    static $projectedMembers = [];
+    $key = $poolId . ':' . $userId;
+    if (isset($projectedMembers[$key])) {
+        return;
+    }
+
+    sync_member_predictions_to_pool($poolId, $userId);
+    $projectedMembers[$key] = true;
+}
+
+/** Sincroniza um palpite canônico para todos os bolões do usuário. */
+function sync_canonical_prediction_to_pools(int $userId, int $matchId, int $home, int $away): void
+{
+    $sql = 'INSERT INTO predictions (pool_id, user_id, match_id, home_pred, away_pred, pontos, atualizado_em)
+            SELECT pm.pool_id, pm.user_id, ?, ?, ?, NULL, UTC_TIMESTAMP()
+            FROM pool_members pm
+            WHERE pm.user_id = ?
+            ON DUPLICATE KEY UPDATE home_pred = VALUES(home_pred),
+                                    away_pred = VALUES(away_pred),
+                                    pontos = NULL,
+                                    atualizado_em = UTC_TIMESTAMP()';
+    db()->prepare($sql)->execute([$matchId, $home, $away, $userId]);
+}
+
+/** Sincroniza todos os palpites canônicos abertos do usuário para seus bolões. */
+function sync_open_canonical_predictions_to_pools(int $userId): void
+{
+    $sql = 'INSERT INTO predictions (pool_id, user_id, match_id, home_pred, away_pred, pontos, atualizado_em)
+            SELECT pm.pool_id, pm.user_id, ump.match_id, ump.home_pred, ump.away_pred, NULL, ump.atualizado_em
+            FROM pool_members pm
+            JOIN user_match_predictions ump ON ump.user_id = pm.user_id
+            JOIN matches m ON m.id = ump.match_id
+            WHERE pm.user_id = ?
+              AND m.kickoff_utc > DATE_ADD(UTC_TIMESTAMP(), INTERVAL ? MINUTE)
+            ON DUPLICATE KEY UPDATE home_pred = VALUES(home_pred),
+                                    away_pred = VALUES(away_pred),
+                                    pontos = NULL,
+                                    atualizado_em = VALUES(atualizado_em)';
+    db()->prepare($sql)->execute([$userId, LOCK_MINUTES]);
+}
+
+/**
  * Mapa match_id => ['home'=>, 'away'=>] com os palpites do usuário no pool.
  * Aplica o palpite padrão do membro para jogos sem registro.
  */
 function user_predictions_map(int $poolId, int $userId, array $member): array
 {
+    ensure_canonical_predictions($userId);
+
     $stmt = db()->prepare(
-        'SELECT match_id, home_pred, away_pred, pontos FROM predictions WHERE pool_id = ? AND user_id = ?'
+        'SELECT ump.match_id, ump.home_pred, ump.away_pred, pr.pontos,
+                m.fase, m.status, m.home_score, m.away_score
+         FROM user_match_predictions ump
+         JOIN matches m ON m.id = ump.match_id
+         LEFT JOIN predictions pr
+           ON pr.pool_id = ? AND pr.user_id = ump.user_id AND pr.match_id = ump.match_id
+         WHERE ump.user_id = ?'
     );
     $stmt->execute([$poolId, $userId]);
     $map = [];
@@ -98,6 +251,7 @@ function user_predictions_map(int $poolId, int $userId, array $member): array
             'home'   => (int)$r['home_pred'],
             'away'   => (int)$r['away_pred'],
             'pontos' => $r['pontos'] === null ? null : (int)$r['pontos'],
+            'score_breakdown' => classic_prediction_breakdown($r, true),
         ];
     }
     return $map; // o padrão é aplicado na exibição quando o jogo não está no mapa
@@ -120,12 +274,15 @@ function save_prediction(int $poolId, int $userId, int $matchId, int $home, int 
         return ['ok' => false, 'error' => 'Placar inválido.'];
     }
 
-    $sql = 'INSERT INTO predictions (pool_id, user_id, match_id, home_pred, away_pred, atualizado_em)
-            VALUES (?, ?, ?, ?, ?, UTC_TIMESTAMP())
+    $sql = 'INSERT INTO user_match_predictions (user_id, match_id, home_pred, away_pred, atualizado_em)
+            VALUES (?, ?, ?, ?, UTC_TIMESTAMP())
             ON DUPLICATE KEY UPDATE home_pred = VALUES(home_pred),
                                     away_pred = VALUES(away_pred),
                                     atualizado_em = UTC_TIMESTAMP()';
-    $pdo->prepare($sql)->execute([$poolId, $userId, $matchId, $home, $away]);
+    $pdo->prepare($sql)->execute([$userId, $matchId, $home, $away]);
+
+    // Mantém a tabela pool-centric como projeção compatível temporária.
+    sync_canonical_prediction_to_pools($userId, $matchId, $home, $away);
     return ['ok' => true];
 }
 
@@ -136,20 +293,24 @@ function save_prediction(int $poolId, int $userId, int $matchId, int $home, int 
 function set_member_default(int $poolId, int $userId, int $home, int $away): void
 {
     $pdo = db();
+    ensure_canonical_predictions($userId);
     $pdo->prepare(
         'UPDATE pool_members SET palpite_padrao_home = ?, palpite_padrao_away = ? WHERE pool_id = ? AND user_id = ?'
     )->execute([$home, $away, $poolId, $userId]);
 
-    // Materializa o padrão nos jogos abertos sem palpite
-    $sql = 'INSERT INTO predictions (pool_id, user_id, match_id, home_pred, away_pred, atualizado_em)
-            SELECT ?, ?, m.id, ?, ?, UTC_TIMESTAMP()
+    // Materializa o padrão na fonte canônica apenas para jogos ainda sem palpite.
+    $sql = 'INSERT INTO user_match_predictions (user_id, match_id, home_pred, away_pred, atualizado_em)
+            SELECT ?, m.id, ?, ?, UTC_TIMESTAMP()
             FROM matches m
             WHERE m.kickoff_utc > DATE_ADD(UTC_TIMESTAMP(), INTERVAL ? MINUTE)
               AND NOT EXISTS (
-                  SELECT 1 FROM predictions p
-                  WHERE p.pool_id = ? AND p.user_id = ? AND p.match_id = m.id
+                  SELECT 1 FROM user_match_predictions ump
+                  WHERE ump.user_id = ? AND ump.match_id = m.id
               )';
-    $pdo->prepare($sql)->execute([$poolId, $userId, $home, $away, LOCK_MINUTES, $poolId, $userId]);
+    $pdo->prepare($sql)->execute([$userId, $home, $away, LOCK_MINUTES, $userId]);
+
+    // Sincroniza a projeção por bolão para manter as telas atuais funcionando.
+    sync_open_canonical_predictions_to_pools($userId);
 }
 
 /** Rótulo de um lado do confronto: seleção real (bandeira + nome) ou placeholder. */
@@ -187,21 +348,50 @@ function render_pool_tabs(array $pool, string $active): void
 /** Ranking de um pool: soma de pontos por usuário, desempate por placares exatos. */
 function pool_ranking(int $poolId, array $pool): array
 {
-    $sql = 'SELECT u.id, u.nome,
-                   COALESCE(SUM(pr.pontos), 0) AS pontos,
-                   SUM(CASE WHEN pr.pontos = ? THEN 1 ELSE 0 END) AS exatos,
+    $memberIds = db()->prepare('SELECT user_id FROM pool_members WHERE pool_id = ?');
+    $memberIds->execute([$poolId]);
+    foreach ($memberIds->fetchAll(PDO::FETCH_COLUMN) as $memberId) {
+        ensure_member_predictions_projected($poolId, (int)$memberId);
+    }
+
+    $multiplierCase = classic_multiplier_case_sql('m.fase');
+    $scenarioCase = classic_scenario_case_sql();
+
+    $sql = "SELECT u.id, u.nome,
+                   COALESCE(SUM(COALESCE(pr.pontos, 0) * {$multiplierCase}), 0) AS pontos,
+                   SUM(CASE WHEN {$scenarioCase} = '" . CLASSIC_SCENARIO_EXACT . "' THEN 1 ELSE 0 END) AS exatos,
+                   SUM(CASE WHEN {$scenarioCase} = '" . CLASSIC_SCENARIO_WINNER_AND_ONE_TEAM_SCORE . "' THEN 1 ELSE 0 END) AS winner_plus_one,
+                   SUM(CASE WHEN {$scenarioCase} = '" . CLASSIC_SCENARIO_WINNER_ONLY . "' THEN 1 ELSE 0 END) AS winner_only,
+                   SUM(CASE WHEN {$scenarioCase} = '" . CLASSIC_SCENARIO_DRAW_NON_EXACT . "' THEN 1 ELSE 0 END) AS draw_non_exact,
+                   SUM(CASE WHEN {$scenarioCase} = '" . CLASSIC_SCENARIO_ONE_TEAM_SCORE_ONLY . "' THEN 1 ELSE 0 END) AS one_team_only,
+                   SUM(CASE WHEN {$scenarioCase} = '" . CLASSIC_SCENARIO_MISS . "' THEN 1 ELSE 0 END) AS misses,
                    (SELECT COALESCE(SUM(bp.pontos),0) FROM bonus_predictions bp
                       WHERE bp.pool_id = pm.pool_id AND bp.user_id = u.id) AS pontos_bonus
             FROM pool_members pm
             JOIN users u ON u.id = pm.user_id
-            LEFT JOIN predictions pr ON pr.pool_id = pm.pool_id AND pr.user_id = u.id
+            LEFT JOIN matches m ON m.status = 'encerrado'
+            LEFT JOIN predictions pr
+                   ON pr.pool_id = pm.pool_id
+                  AND pr.user_id = u.id
+                  AND pr.match_id = m.id
             WHERE pm.pool_id = ?
             GROUP BY u.id, u.nome, pm.pool_id
-            ORDER BY (COALESCE(SUM(pr.pontos),0) +
+            ORDER BY (COALESCE(SUM(COALESCE(pr.pontos, 0) * {$multiplierCase}),0) +
                       (SELECT COALESCE(SUM(bp.pontos),0) FROM bonus_predictions bp
                          WHERE bp.pool_id = pm.pool_id AND bp.user_id = u.id)) DESC,
-                     exatos DESC, u.nome ASC';
+                     exatos DESC,
+                     winner_plus_one DESC,
+                     winner_only DESC,
+                     draw_non_exact DESC,
+                     one_team_only DESC,
+                     misses ASC,
+                     u.nome ASC";
     $stmt = db()->prepare($sql);
-    $stmt->execute([(int)$pool['pts_exato'], $poolId]);
-    return $stmt->fetchAll();
+    $stmt->execute([$poolId]);
+    $rows = $stmt->fetchAll();
+    foreach ($rows as &$row) {
+        $row['tiebreak'] = classic_ranking_tiebreak_breakdown($row);
+    }
+    unset($row);
+    return $rows;
 }
