@@ -1,6 +1,5 @@
 <?php
 require __DIR__ . '/includes/bootstrap.php';
-require __DIR__ . '/includes/email.php';
 
 $token = trim($_GET['token'] ?? ($_POST['token'] ?? ''));
 $msg = '';
