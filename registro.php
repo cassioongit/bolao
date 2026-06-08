@@ -6,7 +6,7 @@ if (is_logged_in()) {
 }
 
 $erros = [];
-$nome = $apelido = $email = '';
+$nome = $apelido = $email = $email2 = '';
 // Se veio de um convite, preservamos o token para entrar no bolão após cadastrar
 $invite = isset($_GET['convite']) ? trim($_GET['convite']) : ($_POST['convite'] ?? '');
 
