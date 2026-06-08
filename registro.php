@@ -98,4 +98,80 @@ require __DIR__ . '/includes/header.php';
     </form>
     <p class="center muted">Já tem conta? <a href="<?= e(APP_URL) ?>/login.php<?= $invite ? '?convite=' . e(urlencode($invite)) : '' ?>">Entrar</a></p>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const email1 = document.querySelector('input[name="email"]');
+    const email2 = document.querySelector('input[name="email2"]');
+    const senha1 = document.querySelector('input[name="senha"]');
+    const senha2 = document.querySelector('input[name="senha2"]');
+
+    function createFeedback(inputEl, isValid) {
+        let feedback = inputEl.parentElement.querySelector('.validation-feedback');
+        if (!feedback) {
+            feedback = document.createElement('small');
+            feedback.className = 'validation-feedback';
+            inputEl.parentElement.appendChild(feedback);
+        }
+        if (isValid === null) {
+            feedback.textContent = '';
+            inputEl.style.borderColor = '';
+        } else if (isValid) {
+            feedback.textContent = '✓ Correto';
+            feedback.style.color = '#27ae60';
+            inputEl.style.borderColor = '#27ae60';
+        } else {
+            feedback.textContent = '✗ Não confere';
+            feedback.style.color = '#e74c3c';
+            inputEl.style.borderColor = '#e74c3c';
+        }
+    }
+
+    // Validação de email em tempo real
+    email2.addEventListener('input', function() {
+        if (email2.value === '') {
+            createFeedback(email2, null);
+        } else if (email1.value === email2.value) {
+            createFeedback(email2, true);
+        } else {
+            createFeedback(email2, false);
+        }
+    });
+
+    email1.addEventListener('input', function() {
+        if (email2.value !== '') {
+            email2.dispatchEvent(new Event('input'));
+        }
+    });
+
+    // Validação de senha em tempo real
+    senha2.addEventListener('input', function() {
+        if (senha2.value === '') {
+            createFeedback(senha2, null);
+        } else if (senha1.value === senha2.value) {
+            createFeedback(senha2, true);
+        } else {
+            createFeedback(senha2, false);
+        }
+    });
+
+    senha1.addEventListener('input', function() {
+        if (senha2.value !== '') {
+            senha2.dispatchEvent(new Event('input'));
+        }
+    });
+});
+</script>
+
+<style>
+.validation-feedback {
+    display: block;
+    margin-top: 4px;
+    font-size: 0.85rem;
+}
+input[style*="border-color"] {
+    transition: border-color 0.2s;
+}
+</style>
+
 <?php require __DIR__ . '/includes/footer.php'; ?>
