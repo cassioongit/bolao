@@ -87,13 +87,19 @@ require __DIR__ . '/includes/header.php';
         <input type="email" name="email" value="<?= e($email) ?>" required maxlength="190">
 
         <label>Confirme o e-mail</label>
-        <input type="email" name="email2" value="<?= e($email2) ?>" required maxlength="190" placeholder="Digite o mesmo e-mail acima">
+        <div style="position: relative; margin-bottom: 12px;">
+            <input type="email" name="email2" value="<?= e($email2) ?>" required maxlength="190" placeholder="Digite o mesmo e-mail acima">
+            <small class="validation-feedback-email" style="display: none;"></small>
+        </div>
         <p class="muted" style="font-size: 0.9rem; margin-top: 6px;">⚠️ Verifique se digitou o e-mail corretamente. Vamos enviar um link de confirmação. Se não receber, procure na pasta de <strong>Spam</strong>.</p>
 
         <label style="margin-top: 12px">Senha</label>
         <input type="password" name="senha" required minlength="6">
         <label>Repita a senha</label>
-        <input type="password" name="senha2" required minlength="6">
+        <div style="position: relative; margin-bottom: 12px;">
+            <input type="password" name="senha2" required minlength="6">
+            <small class="validation-feedback-senha" style="display: none;"></small>
+        </div>
         <p style="margin-top:16px"><button class="btn btn-block" type="submit">Criar conta</button></p>
     </form>
     <p class="center muted">Já tem conta? <a href="<?= e(APP_URL) ?>/login.php<?= $invite ? '?convite=' . e(urlencode($invite)) : '' ?>">Entrar</a></p>
@@ -105,24 +111,23 @@ document.addEventListener('DOMContentLoaded', function() {
     const email2 = document.querySelector('input[name="email2"]');
     const senha1 = document.querySelector('input[name="senha"]');
     const senha2 = document.querySelector('input[name="senha2"]');
+    const feedbackEmail = document.querySelector('.validation-feedback-email');
+    const feedbackSenha = document.querySelector('.validation-feedback-senha');
 
-    function createFeedback(inputEl, isValid) {
-        let feedback = inputEl.parentElement.querySelector('.validation-feedback');
-        if (!feedback) {
-            feedback = document.createElement('small');
-            feedback.className = 'validation-feedback';
-            inputEl.parentElement.appendChild(feedback);
-        }
+    function updateFeedback(feedback, inputEl, isValid) {
         if (isValid === null) {
             feedback.textContent = '';
+            feedback.style.display = 'none';
             inputEl.style.borderColor = '';
         } else if (isValid) {
             feedback.textContent = '✓ Correto';
             feedback.style.color = '#27ae60';
+            feedback.style.display = 'block';
             inputEl.style.borderColor = '#27ae60';
         } else {
             feedback.textContent = '✗ Não confere';
             feedback.style.color = '#e74c3c';
+            feedback.style.display = 'block';
             inputEl.style.borderColor = '#e74c3c';
         }
     }
@@ -130,11 +135,11 @@ document.addEventListener('DOMContentLoaded', function() {
     // Validação de email em tempo real
     email2.addEventListener('input', function() {
         if (email2.value === '') {
-            createFeedback(email2, null);
+            updateFeedback(feedbackEmail, email2, null);
         } else if (email1.value === email2.value) {
-            createFeedback(email2, true);
+            updateFeedback(feedbackEmail, email2, true);
         } else {
-            createFeedback(email2, false);
+            updateFeedback(feedbackEmail, email2, false);
         }
     });
 
@@ -147,11 +152,11 @@ document.addEventListener('DOMContentLoaded', function() {
     // Validação de senha em tempo real
     senha2.addEventListener('input', function() {
         if (senha2.value === '') {
-            createFeedback(senha2, null);
+            updateFeedback(feedbackSenha, senha2, null);
         } else if (senha1.value === senha2.value) {
-            createFeedback(senha2, true);
+            updateFeedback(feedbackSenha, senha2, true);
         } else {
-            createFeedback(senha2, false);
+            updateFeedback(feedbackSenha, senha2, false);
         }
     });
 
@@ -164,14 +169,10 @@ document.addEventListener('DOMContentLoaded', function() {
 </script>
 
 <style>
-input[name="email2"],
-input[name="senha2"] {
-    margin-bottom: 2px;
-}
-.validation-feedback {
+.validation-feedback-email,
+.validation-feedback-senha {
     display: block;
-    margin-top: 2px;
-    margin-bottom: 12px;
+    margin-top: 3px;
     font-size: 0.8rem;
     font-weight: 600;
 }
