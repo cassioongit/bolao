@@ -164,10 +164,16 @@ document.addEventListener('DOMContentLoaded', function() {
 </script>
 
 <style>
+input[name="email2"],
+input[name="senha2"] {
+    margin-bottom: 2px;
+}
 .validation-feedback {
     display: block;
-    margin-top: 4px;
-    font-size: 0.85rem;
+    margin-top: 2px;
+    margin-bottom: 12px;
+    font-size: 0.8rem;
+    font-weight: 600;
 }
 input[style*="border-color"] {
     transition: border-color 0.2s;
