@@ -96,6 +96,13 @@ define('MAIL_FROM_NAME', env('MAIL_FROM_NAME', APP_NAME));
 define('MAIL_FROM_EMAIL', env('MAIL_FROM_EMAIL', ''));
 define('MAIL_LOG_DIR', env('MAIL_LOG_DIR', dirname(__DIR__) . '/nimbalyst-local/outbox'));
 
+// SMTP (quando MAIL_DRIVER=smtp)
+define('MAIL_HOST', env('MAIL_HOST', ''));
+define('MAIL_PORT', (int)env('MAIL_PORT', 587));
+define('MAIL_USERNAME', env('MAIL_USERNAME', ''));
+define('MAIL_PASSWORD', env('MAIL_PASSWORD', ''));
+define('MAIL_ENCRYPTION', env('MAIL_ENCRYPTION', 'tls'));
+
 // Internamente trabalhamos sempre em UTC
 date_default_timezone_set('UTC');
 
