@@ -22,9 +22,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             );
             $upd->execute([$tk, $u['id']]);
             $link = APP_URL . '/recuperar-senha.php?token=' . urlencode($tk);
-            $corpo = '<p>Olá, ' . e($u['nome']) . '!</p>'
+            $corpo = '<h2>Recuperação de Senha</h2>'
+                . '<p>Olá, ' . e($u['nome']) . '!</p>'
                 . '<p>Para criar uma nova senha no ' . e(APP_NAME) . ', clique no link abaixo (válido por 2 horas):</p>'
-                . '<p><a href="' . e($link) . '">' . e($link) . '</a></p>';
+                . '<p><a href="' . e($link) . '" style="display: inline-block; padding: 10px 20px; background: #2ecc71; color: white; text-decoration: none; border-radius: 5px;">Redefinir Senha</a></p>'
+                . '<p>Ou copie e cole este endereço: <code>' . e($link) . '</code></p>'
+                . '<p><small>Se você não solicitou isso, ignore este email.</small></p>';
             send_email($email, 'Recuperar senha — ' . APP_NAME, $corpo);
         }
         // Mensagem genérica (não revela se o e-mail existe)
