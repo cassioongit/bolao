@@ -33,13 +33,31 @@ function send_email(string $to, string $subject, string $body): bool
     }
 }
 
-/** Envia via SMTP real. */
+/** Envia via SMTP real com PHPMailer. */
 function send_email_smtp(string $to, string $subject, string $body, string $from, string $fromName): bool
 {
-    // Para SMTP real em produção, recomenda-se usar PHPMailer ou SwiftMailer
-    // Por enquanto, usamos modo log para testes. Configure PHPMailer para produção.
-    error_log("EMAIL ENVIADO PARA: $to | Assunto: $subject");
-    return send_email_log($to, $subject, $body, $from, $fromName);
+    try {
+        $mail = new \PHPMailer\PHPMailer\PHPMailer(true);
+        $mail->isSMTP();
+        $mail->Host       = MAIL_HOST;
+        $mail->SMTPAuth   = true;
+        $mail->Username   = MAIL_USERNAME;
+        $mail->Password   = MAIL_PASSWORD;
+        $mail->SMTPSecure = MAIL_ENCRYPTION === 'ssl' ? \PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_SMTPS : \PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_STARTTLS;
+        $mail->Port       = MAIL_PORT;
+
+        $mail->setFrom($from, $fromName);
+        $mail->addAddress($to);
+        $mail->isHTML(true);
+        $mail->Subject = $subject;
+        $mail->Body    = $body;
+        $mail->AltBody = strip_tags($body);
+
+        return $mail->send();
+    } catch (\PHPMailer\PHPMailer\Exception $e) {
+        error_log("Erro ao enviar email: " . $mail->ErrorInfo);
+        return false;
+    }
 }
 
 /** Salva email em arquivo (para testes). */
