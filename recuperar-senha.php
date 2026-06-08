@@ -5,6 +5,7 @@ $token = trim($_GET['token'] ?? ($_POST['token'] ?? ''));
 $msg = '';
 $msgType = 'info';
 $modo = $token !== '' ? 'reset' : 'pedido';
+$senhaAlterada = false;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_require();
@@ -59,8 +60,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'UPDATE users SET senha_hash = ?, token_reset = NULL, token_reset_exp = NULL WHERE id = ?'
             );
             $upd->execute([password_hash($senha, PASSWORD_DEFAULT), $u['id']]);
-            flash('Senha alterada com sucesso. Faça login.', 'success');
-            redirect('login.php');
+            $senhaAlterada = true;
         }
     }
 }
@@ -98,4 +98,60 @@ require __DIR__ . '/includes/header.php';
         <p class="center"><a href="<?= e(APP_URL) ?>/login.php">Voltar</a></p>
     <?php endif; ?>
 </div>
+
+<?php if ($senhaAlterada): ?>
+<div id="success-modal" class="modal-overlay show">
+    <div class="modal">
+        <div class="modal-body">
+            <h2 style="text-align: center; color: #27ae60; margin-bottom: 20px;">✓ Senha Alterada com Sucesso!</h2>
+            <p style="text-align: center; margin-bottom: 24px;">Sua senha foi redefinida. Agora você pode fazer login com a nova senha.</p>
+            <a href="<?= e(APP_URL) ?>/login.php" class="btn btn-block" style="text-align: center;">Ir para Login</a>
+        </div>
+    </div>
+</div>
+
+<style>
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    display: none;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.modal-overlay.show {
+    display: flex;
+}
+
+.modal {
+    background: white;
+    border-radius: 10px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+    max-width: 400px;
+    padding: 0;
+    animation: slideUp 0.3s ease-out;
+}
+
+.modal-body {
+    padding: 30px 25px;
+}
+
+@keyframes slideUp {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+</style>
+<?php endif; ?>
+
 <?php require __DIR__ . '/includes/footer.php'; ?>

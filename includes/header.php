@@ -20,6 +20,10 @@ $title = isset($page_title) ? ($page_title . ' · ' . APP_NAME) : APP_NAME;
     <link rel="stylesheet" href="<?= e(APP_URL) ?>/assets/css/style.css?v=1">
 </head>
 <body>
+<div id="page-loader" class="page-loader">
+    <div class="spinner"></div>
+</div>
+
 <header class="topbar">
     <div class="container topbar-inner">
         <a class="brand" href="<?= e(APP_URL) ?>/dashboard.php">⚽ <?= e(APP_NAME) ?></a>
