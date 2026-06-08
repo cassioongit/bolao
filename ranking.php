@@ -87,7 +87,7 @@ require __DIR__ . '/includes/header.php';
         ?>
             <tr class="<?= $me ? 'me' : '' ?>">
                 <td data-label="#" class="rank-pos"><?= $pos ?>º</td>
-                <td data-label="Participante"><?= e($r['nome']) ?><?= $me ? ' <span class="muted">(você)</span>' : '' ?></td>
+                <td data-label="Participante"><?= e(user_display_name($r)) ?><?= $me ? ' <span class="muted">(você)</span>' : '' ?></td>
                 <td data-label="Bônus" style="text-align:right"><?= (int)$r['pontos_bonus'] ?></td>
                 <td data-label="Exatos" style="text-align:right"><?= (int)$r['exatos'] ?></td>
                 <td data-label="Pontos" class="rank-pts"><?= $total ?></td>

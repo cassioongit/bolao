@@ -7,6 +7,7 @@ SET time_zone = '+00:00';
 CREATE TABLE IF NOT EXISTS users (
     id                  INT UNSIGNED NOT NULL AUTO_INCREMENT,
     nome                VARCHAR(80)  NOT NULL,
+    apelido             VARCHAR(40)  DEFAULT NULL,
     email               VARCHAR(190) NOT NULL,
     senha_hash          VARCHAR(255) NOT NULL,
     is_admin            TINYINT(1)   NOT NULL DEFAULT 0,

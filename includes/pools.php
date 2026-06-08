@@ -365,7 +365,7 @@ function pool_ranking(int $poolId, array $pool): array
     $multiplierCase = classic_multiplier_case_sql('m.fase');
     $scenarioCase = classic_scenario_case_sql();
 
-    $sql = "SELECT u.id, u.nome,
+    $sql = "SELECT u.id, u.nome, u.apelido,
                    COALESCE(SUM(COALESCE(pr.pontos, 0) * {$multiplierCase}), 0) AS pontos,
                    SUM(CASE WHEN {$scenarioCase} = '" . CLASSIC_SCENARIO_EXACT . "' THEN 1 ELSE 0 END) AS exatos,
                    SUM(CASE WHEN {$scenarioCase} = '" . CLASSIC_SCENARIO_WINNER_AND_ONE_TEAM_SCORE . "' THEN 1 ELSE 0 END) AS winner_plus_one,

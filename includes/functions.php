@@ -9,6 +9,56 @@ function e(?string $s): string
     return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
 }
 
+/** Retorna apelido ou primeiro nome do usuário. */
+function user_display_name(array $user): string
+{
+    if (!empty($user['apelido'])) {
+        return $user['apelido'];
+    }
+    $nome = $user['nome'] ?? '';
+    $partes = explode(' ', $nome);
+    return $partes[0] ?? $nome;
+}
+
+/** Envia email (SMTP ou log). */
+function send_email(string $to, string $subject, string $body): bool
+{
+    $from = MAIL_FROM_EMAIL ?: 'noreply@' . parse_url(APP_URL, PHP_URL_HOST);
+    $fromName = MAIL_FROM_NAME;
+
+    if (MAIL_DRIVER === 'smtp') {
+        return send_email_smtp($to, $subject, $body, $from, $fromName);
+    } else {
+        return send_email_log($to, $subject, $body, $from, $fromName);
+    }
+}
+
+/** Envia via SMTP real. */
+function send_email_smtp(string $to, string $subject, string $body, string $from, string $fromName): bool
+{
+    $eol = "\r\n";
+    $headers = "From: {$fromName} <{$from}>" . $eol;
+    $headers .= "Content-Type: text/html; charset=UTF-8" . $eol;
+    $headers .= "MIME-Version: 1.0" . $eol;
+
+    ini_set('SMTP', MAIL_HOST);
+    ini_set('smtp_port', MAIL_PORT);
+    ini_set('auth_username', MAIL_USERNAME);
+    ini_set('auth_password', MAIL_PASSWORD);
+
+    return mail($to, $subject, $body, $headers);
+}
+
+/** Salva email em arquivo (para testes). */
+function send_email_log(string $to, string $subject, string $body, string $from, string $fromName): bool
+{
+    $dir = MAIL_LOG_DIR;
+    @mkdir($dir, 0755, true);
+    $file = $dir . '/' . time() . '_' . md5($to) . '.txt';
+    $content = "To: {$to}\nFrom: {$fromName} <{$from}>\nSubject: {$subject}\n\n{$body}";
+    return file_put_contents($file, $content) !== false;
+}
+
 /** Redireciona e encerra. */
 function redirect(string $path): void
 {

@@ -42,7 +42,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $isOwner) {
 
 // Lista de membros
 $stmt = db()->prepare(
-    'SELECT u.id, u.nome, pm.papel FROM pool_members pm JOIN users u ON u.id = pm.user_id
+    'SELECT u.id, u.nome, u.apelido, pm.papel FROM pool_members pm JOIN users u ON u.id = pm.user_id
      WHERE pm.pool_id = ? ORDER BY pm.papel = \'owner\' DESC, u.nome'
 );
 $stmt->execute([$poolId]);
@@ -69,7 +69,7 @@ require __DIR__ . '/includes/header.php';
         <tbody>
         <?php foreach ($membros as $m): ?>
             <tr>
-                <td><?= e($m['nome']) ?> <?= $m['papel'] === 'owner' ? '<span class="muted">· dono</span>' : '' ?></td>
+                <td><?= e(user_display_name($m)) ?> <?= $m['papel'] === 'owner' ? '<span class="muted">· dono</span>' : '' ?></td>
                 <td style="text-align:right">
                     <?php if ($isOwner && $m['papel'] !== 'owner'): ?>
                         <form method="post" style="display:inline" onsubmit="return confirm('Remover este participante?')">
